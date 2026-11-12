@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+@theme {
+  --color-accent: #ea580c;
+  --color-accent-dark: #c2410c;
+  --color-accent-soft: #fff7ed;
+}
+
+html, body { background: #f8fafc; color: #0f172a; overflow-x: hidden; }
+body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; }
+.input { border: 1px solid #cbd5e1; border-radius: 8px; padding: 6px 10px; font-size: 14px; background: #fff; min-width: 0; }
+.input:focus { outline: 2px solid #fdba74; border-color: #ea580c; }
+.btn { background: #ea580c; color: #fff; border-radius: 8px; padding: 7px 14px; font-size: 14px; font-weight: 600; display: inline-block; }
+.btn:hover { background: #c2410c; }
+.btn-ghost { border: 1px solid #cbd5e1; border-radius: 8px; padding: 6px 12px; font-size: 14px; background: #fff; display: inline-block; }
+.btn-ghost:hover { background: #f1f5f9; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tbl th { text-align: left; font-weight: 600; color: #475569; background: #f8fafc; padding: 8px 10px; white-space: nowrap; border-bottom: 1px solid #e2e8f0; }
+.tbl td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+.tbl tr:hover td { background: #fffaf5; }
+.leaflet-container { height: 100%; width: 100%; font-family: inherit; }
