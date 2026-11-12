@@ -17,7 +17,7 @@ export default async function LogPage({ searchParams }: { searchParams: Promise<
 
   const base = {
     from: f.from, to: f.to, q: f.q, action: f.action, outcome: f.outcome, reason: f.reason,
-    face: f.face, source: f.source, offline: f.offline ? "1" : "",
+    face: f.face, source: f.source, how: f.how, offline: f.offline ? "1" : "",
   };
 
   return (
@@ -49,6 +49,11 @@ export default async function LogPage({ searchParams }: { searchParams: Promise<
           <select className="input w-full" name="source" defaultValue={f.source}>
             <option value="">All</option><option value="app">App</option><option value="kiosk">Kiosk</option>
             <option value="auto">Auto</option><option value="manual">Manual</option>
+          </select></label>
+        <label className="text-xs text-slate-600">How
+          <select className="input w-full" name="how" defaultValue={f.how}>
+            <option value="">All</option><option value="swipe">Swipe in app</option><option value="offline">Offline sync</option>
+            <option value="kiosk">Kiosk</option><option value="auto">Automatic</option><option value="manual">Manual by admin</option>
           </select></label>
         <label className="flex items-end gap-2 pb-2 text-sm"><input type="checkbox" name="offline" value="1" defaultChecked={f.offline} /> Offline only</label>
         <div className="flex items-end gap-2">

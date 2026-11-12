@@ -4,6 +4,10 @@ import { fmtDateTime, istDay } from "@/lib/time";
 import { qs } from "@/lib/params";
 import { Badge, EmployeeLink, FailedFacePhoto, FaceBadge, OutcomeBadge, TableWrap } from "./ui";
 
+const HOW: Record<string, string> = {
+  swipe: "Swipe in app", offline: "Offline sync", kiosk: "Kiosk", auto: "Automatic", manual: "Manual by admin", unknown: "Unknown (older app)",
+};
+
 export default function LogTable({ rows }: { rows: LogRow[] }) {
   return (
     <TableWrap>
@@ -11,17 +15,21 @@ export default function LogTable({ rows }: { rows: LogRow[] }) {
         <thead>
           <tr>
             <th>Time (IST)</th><th>Employee</th><th>Action</th><th>Outcome</th><th>Reason</th><th>Mode</th>
-            <th>Source</th><th>Net</th><th>Face</th><th>Late</th><th>Location</th><th>IP</th>
+            <th>Source</th><th>How</th><th>Net</th><th>Face</th><th>Late</th><th>Location</th><th>IP</th>
           </tr>
         </thead>
         <tbody>
           {rows.length === 0 && (
-            <tr><td colSpan={12} className="py-6 text-center text-slate-500">No records for this filter.</td></tr>
+            <tr><td colSpan={13} className="py-6 text-center text-slate-500">No records for this filter.</td></tr>
           )}
           {rows.map((r) => (
             <tr key={`${r.kind}-${r.rid}`}>
               <td className="whitespace-nowrap">{fmtDateTime(r.ts)}</td>
-              <td className="whitespace-nowrap"><EmployeeLink code={r.code} name={r.name} /></td>
+              <td className="whitespace-nowrap"><EmployeeLink code={r.code} name={r.name} />
+                {r.code && (
+                  <div><Link className="text-xs text-slate-500 underline" href={`/employees/${encodeURIComponent(r.code)}/day${qs({ date: istDay(r.ts) })}`}>Day timeline</Link></div>
+                )}
+              </td>
               <td className="whitespace-nowrap">{r.action === "CHECK_IN" ? "Check-in" : r.action === "CHECK_OUT" ? "Check-out" : "Unknown"}</td>
               <td><OutcomeBadge outcome={r.outcome} /></td>
               <td className="min-w-40 max-w-64">
@@ -36,6 +44,7 @@ export default function LogTable({ rows }: { rows: LogRow[] }) {
               </td>
               <td>{r.mode ? r.mode.toLowerCase() : "-"}</td>
               <td>{r.source ?? "-"}</td>
+              <td className="whitespace-nowrap">{HOW[r.how] ?? r.how}</td>
               <td>{r.offline ? <Badge tone="orange">offline</Badge> : <span className="text-slate-500">online</span>}</td>
               <td><FaceBadge status={r.face} sim={r.sim} /></td>
               <td>{r.late ? `${r.late}m` : "-"}</td>

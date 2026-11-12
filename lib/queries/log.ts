@@ -1,4 +1,4 @@
-import { Params, attemptsEnabled, query } from "../db";
+import { Params, attemptsEnabled, pgCode, query } from "../db";
 import { enumParam, likeEscape, rangeParams, str, type SP } from "../params";
 import { istRangeSql, msSql } from "../time";
 
@@ -13,6 +13,7 @@ export interface LogFilters {
   face: "" | "MATCHED" | "MISMATCH" | "UNAVAILABLE" | "NOT_CHECKED";
   source: "" | "app" | "kiosk" | "auto" | "manual";
   offline: boolean;
+  how: "" | "swipe" | "offline" | "kiosk" | "auto" | "manual";
 }
 
 export interface LogRow {
@@ -39,6 +40,7 @@ export interface LogRow {
   attId: string | null;
   hasPhoto: boolean;
   aHasPhoto: boolean; // attempt (failed-face) photo available
+  how: string; // swipe | offline | kiosk | auto | manual | unknown
 }
 
 export const REASONS = [
@@ -61,10 +63,12 @@ export function parseLogFilters(sp: SP, defDays = 0): LogFilters {
     face: enumParam(sp, "face", ["", "MATCHED", "MISMATCH", "UNAVAILABLE", "NOT_CHECKED"] as const, ""),
     source: enumParam(sp, "source", ["", "app", "kiosk", "auto", "manual"] as const, ""),
     offline: str(sp, "offline", 2) === "1",
+    how: enumParam(sp, "how", ["", "swipe", "offline", "kiosk", "auto", "manual"] as const, ""),
   };
 }
 
-function buildSql(f: LogFilters, withAttempts: boolean, limit: number, offset: number) {
+function buildSql(f: LogFilters, withAttempts: boolean, limit: number, offset: number, newCols = true) {
+  const ca = newCols ? 'a."clientAction"' : "NULL::text";
   const p = new Params();
   const from = p.add(f.from);
   const to = p.add(f.to);
@@ -80,7 +84,9 @@ function buildSql(f: LogFilters, withAttempts: boolean, limit: number, offset: n
       COALESCE(att."faceSimilarity", a."faceSimilarity")::float8 AS sim,
       att."lateMinutes"::int AS late,
       a."latitude"::float8 AS lat, a."longitude"::float8 AS lng, a."mocked" AS mocked,
-      a."ipAddress"::text AS ip, a."attendanceId" AS "attId", COALESCE(att."hasPhoto", false) AS "hasPhoto", COALESCE(a."hasPhoto", false) AS "aHasPhoto"
+      a."ipAddress"::text AS ip, a."attendanceId" AS "attId", COALESCE(att."hasPhoto", false) AS "hasPhoto", COALESCE(a."hasPhoto", false) AS "aHasPhoto",
+      CASE WHEN upper(a."source") = 'KIOSK' THEN 'kiosk' WHEN ${ca} = 'OFFLINE_SYNC' OR a."offline" THEN 'offline'
+           WHEN ${ca} = 'SLIDE_TO_CONFIRM' THEN 'swipe' ELSE 'unknown' END AS how
     FROM "CheckInAttempt" a
     LEFT JOIN "User" u ON u."id" = a."userId"
     LEFT JOIN "Attendance" att ON att."id" = a."attendanceId"
@@ -97,7 +103,8 @@ function buildSql(f: LogFilters, withAttempts: boolean, limit: number, offset: n
       COALESCE(att."recordedOffline", false) AS offline,
       att."faceVerifyStatus"::text AS face, att."faceSimilarity"::float8 AS sim, att."lateMinutes"::int AS late,
       NULL::float8 AS lat, NULL::float8 AS lng, NULL::boolean AS mocked, NULL::text AS ip,
-      att."id" AS "attId", att."hasPhoto" AS "hasPhoto", false AS "aHasPhoto"
+      att."id" AS "attId", att."hasPhoto" AS "hasPhoto", false AS "aHasPhoto",
+      CASE att."method"::text WHEN 'AUTO' THEN 'auto' WHEN 'MANUAL' THEN 'manual' WHEN 'QR' THEN 'kiosk' ELSE 'unknown' END AS how
     FROM "Attendance" att
     JOIN "User" u ON u."id" = att."userId"
     WHERE ${istRangeSql('att."timestamp"', from, to)}
@@ -115,6 +122,7 @@ function buildSql(f: LogFilters, withAttempts: boolean, limit: number, offset: n
   if (f.face) where.push(`x.face = ${p.add(f.face)}`);
   if (f.source) where.push(`x.source = ${p.add(f.source)}`);
   if (f.offline) where.push(`x.offline`);
+  if (f.how) where.push(`x.how = ${p.add(f.how)}`);
 
   const sql = `
     SELECT * FROM (
@@ -132,7 +140,13 @@ export async function queryLog(
   offset: number,
 ): Promise<{ rows: LogRow[]; attemptsEnabled: boolean }> {
   const enabled = await attemptsEnabled();
-  const { sql, values } = buildSql(f, enabled, limit, offset);
-  const rows = await query<LogRow>(sql, values);
-  return { rows, attemptsEnabled: enabled };
+  try {
+    const { sql, values } = buildSql(f, enabled, limit, offset, true);
+    return { rows: await query<LogRow>(sql, values), attemptsEnabled: enabled };
+  } catch (e) {
+    // 42703 = new "clientAction" column not migrated yet: retry without it.
+    if (!enabled || pgCode(e) !== "42703") throw e;
+    const { sql, values } = buildSql(f, enabled, limit, offset, false);
+    return { rows: await query<LogRow>(sql, values), attemptsEnabled: enabled };
+  }
 }

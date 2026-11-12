@@ -20,17 +20,25 @@ export interface AlertsResult {
   attemptsEnabled: boolean;
 }
 
-export async function getAlerts(from: string, to: string): Promise<AlertsResult> {
+export type How = "" | "swipe" | "offline" | "kiosk" | "auto" | "manual";
+
+export async function getAlerts(from: string, to: string, how: How = ""): Promise<AlertsResult> {
   const enabled = await attemptsEnabled();
   const alerts: Alert[] = [];
   const range = (col: string) => istRangeSql(col, "$1", "$2");
-  const base = { from, to };
+  const base = { from, to, how };
+  // "How" narrows attempt-based rules to one channel; non-attempt rules only show for All / the matching channel.
+  const attemptHow =
+    how === "kiosk" ? ` AND upper("source") = 'KIOSK'`
+    : how === "offline" ? ` AND ("offline" OR "clientAction" = 'OFFLINE_SYNC')`
+    : how === "swipe" ? ` AND "clientAction" = 'SLIDE_TO_CONFIRM'` : "";
+  const attemptRules = how === "" || how === "swipe" || how === "offline" || how === "kiosk";
 
-  if (enabled) {
+  if (enabled && attemptRules) {
     const rej = await query<{ reasonCode: string | null; n: number }>(
       `SELECT COALESCE("reasonCode", 'OTHER') AS "reasonCode", count(*)::int AS n
        FROM "CheckInAttempt"
-       WHERE "outcome" IN ('REJECTED','ERROR') AND ${range('"createdAt"')}
+       WHERE "outcome" IN ('REJECTED','ERROR') AND ${range('"createdAt"')}${attemptHow}
        GROUP BY 1 ORDER BY n DESC`,
       [from, to],
     );
@@ -49,7 +57,7 @@ export async function getAlerts(from: string, to: string): Promise<AlertsResult>
     const pins = await query<{ code: string; day: string; n: number }>(
       `SELECT "employeeCode" AS code, to_char(("createdAt" + interval '330 minutes')::date, 'YYYY-MM-DD') AS day, count(*)::int AS n
        FROM "CheckInAttempt"
-       WHERE "reasonCode" = 'INVALID_PIN' AND ${range('"createdAt"')}
+       WHERE "reasonCode" = 'INVALID_PIN' AND ${range('"createdAt"')}${attemptHow}
        GROUP BY 1, 2 HAVING count(*) >= 3 ORDER BY n DESC, day DESC LIMIT 50`,
       [from, to],
     );

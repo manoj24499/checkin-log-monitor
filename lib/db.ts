@@ -76,3 +76,9 @@ export class Params {
     return `$${this.values.length}`;
   }
 }
+
+/** Postgres errors meaning "table/column missing" (migration not applied) or "no privilege" (role script not re-run). */
+export function isMissing(e: unknown): boolean {
+  const c = pgCode(e);
+  return c === "42P01" || c === "42703" || c === "42501";
+}

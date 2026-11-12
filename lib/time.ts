@@ -46,3 +46,37 @@ export function istRangeSql(col: string, fromParam: string, toParam: string): st
 export function msSql(col: string): string {
   return `(extract(epoch from ${col}) * 1000)::float8`;
 }
+
+/** Epoch ms of an IST wall-clock time ("YYYY-MM-DD" + "HH:mm"). */
+export function istMs(day: string, hhmm = "00:00"): number {
+  return Date.parse(`${day}T${hhmm}:00+05:30`);
+}
+
+/** SQL: UTC-naive column within [aParam, bParam) where both params are epoch milliseconds. */
+export function msRangeSql(col: string, aParam: string, bParam: string): string {
+  return `${col} >= (to_timestamp(${aParam}::float8 / 1000) AT TIME ZONE 'UTC') AND ${col} < (to_timestamp(${bParam}::float8 / 1000) AT TIME ZONE 'UTC')`;
+}
+
+/** Weekday (0=Sunday) of an IST date string. */
+export function weekdayOf(day: string): number {
+  return new Date(`${day}T00:00:00Z`).getUTCDay();
+}
+
+export const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+export function fmtTimeSec(ms: number | null | undefined): string {
+  if (ms == null || !Number.isFinite(ms)) return "-";
+  return new Intl.DateTimeFormat("en-IN", { timeZone: TZ, hour: "numeric", minute: "2-digit", second: "2-digit", hour12: true }).format(new Date(ms));
+}
+
+/** "15:00" -> "3:00 PM" */
+export function hhmm12(s: string | null | undefined): string {
+  const m = /^(\d{1,2}):(\d{2})/.exec(s ?? "");
+  if (!m) return s ?? "-";
+  const h = Number(m[1]);
+  return `${h % 12 === 0 ? 12 : h % 12}:${m[2]} ${h >= 12 ? "PM" : "AM"}`;
+}
+
+export function addDaysSafe(day: string, n: number): string {
+  return addDays(day, n);
+}
