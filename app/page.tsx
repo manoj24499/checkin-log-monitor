@@ -27,6 +27,13 @@ export default async function Overview({ searchParams }: { searchParams: Promise
         <button className="btn" type="submit">Show</button>
         <a className="btn-ghost" href="/">Today</a>
       </form>
+      <form method="get" action="/employees" className="mb-4 flex items-end gap-2">
+        <label className="text-xs text-slate-600">Day timeline for employee code
+          <input className="input block" name="q" placeholder="e.g. EMP001" maxLength={60} />
+        </label>
+        <input type="hidden" name="day" value={day} />
+        <button className="btn-ghost" type="submit">Find</button>
+      </form>
       {!s.attemptsEnabled && <Notice>{ATTEMPT_NOTICE}</Notice>}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Stat label="Checked in" value={s.checkedIn} href={`/log${qs({ ...r, action: "CHECK_IN", outcome: "success" })}`} />

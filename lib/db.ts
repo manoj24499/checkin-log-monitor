@@ -82,3 +82,22 @@ export function isMissing(e: unknown): boolean {
   const c = pgCode(e);
   return c === "42P01" || c === "42703" || c === "42501";
 }
+
+let caCache: { at: number; ok: boolean } | null = null;
+
+/** Whether "CheckInAttempt"."clientAction" exists (migration 20261113000000 applied). Cached for 20s. */
+export async function clientActionEnabled(): Promise<boolean> {
+  if (caCache && Date.now() - caCache.at < 20000) return caCache.ok;
+  let ok = false;
+  try {
+    const r = await query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM pg_attribute
+       WHERE attrelid = to_regclass('public."CheckInAttempt"') AND attname = 'clientAction' AND NOT attisdropped`,
+    );
+    ok = (r[0]?.n ?? 0) > 0;
+  } catch (e) {
+    if (!isMissing(e)) throw e;
+  }
+  caCache = { at: Date.now(), ok };
+  return ok;
+}

@@ -11,9 +11,23 @@ Read-only monitoring website for the Inzivo check-in product: every check-in/out
 | `/faces` | Face verification results, photos, failed-verification attempts (with photos), gaps |
 | `/map` | Check-in/out points on one map; pick an employee to draw the day's trail and tracking gaps (>15 min) |
 | `/employees`, `/employees/[code]` | Searchable list; per-employee timeline, attempts, photos |
-| `/alerts` | "Needs attention" rules over a date range |
+| `/alerts` | "Needs attention" rules over a date range (filter by "How") |
+| `/employees/[code]/day?date=YYYY-MM-DD` | Forensic day timeline for one employee (see below) |
 
 All times are shown in IST (12-hour). Overview and Log auto-refresh every 60 s (pausable).
+
+## Day timeline (forensic view)
+
+`/employees/<code>/day?date=YYYY-MM-DD` proves what happened on one IST day (including the part of an overnight session after midnight). It has:
+
+- A **"How did each check-in / check-out happen?"** card: one plain-English line per record (employee with slide button / offline queue / kiosk, with app version, phone, OS and location; automatic by the system with trigger, shift, warning and whether the notification was delivered; manual by admin with reason). Old automatic check-outs with no event row say details were not recorded and show a computed likely cause (check-out time vs. the shift assigned for that weekday, overtime end, permission end, end of day). A red chip appears if the employee kept sending location pings or made later swipe attempts after an automatic check-out.
+- One **chronological feed** (IST, with seconds) merging swipe attempts (accepted and refused), attendance records, `AttendanceEvent` rows (auto check-outs, warnings, manual entries, every push and whether delivered), pauses, work segments, permissions, overtime requests and a location-ping summary with every gap over 15 minutes. Each item has an expandable raw detail.
+
+It is linked from the employee page (each day), Activity log rows, and the Employees list (Overview has a lookup box). The employee page also shows **Shift assignments** (7 weekdays) and **Automatic check-outs** for the date range. `/log` and `/alerts` have a **How** filter (swipe / offline sync / kiosk / automatic / manual); `/alerts` has an "Automatic check-outs" rule with trigger and warning delivery.
+
+### Backend migration 20261113000000_attendance_events
+
+Adds `CheckInAttempt` columns `appVersion`, `platform`, `osVersion`, `deviceModel`, `clientAction` (SLIDE_TO_CONFIRM | OFFLINE_SYNC) and the `AttendanceEvent` table. Until it is applied the site keeps working: the timeline shows a notice and uses what exists. **After applying it, re-run `scripts/create-readonly-role.sql`** - it also grants the extra read-only tables used here (`AttendancePause`, `WorkSegment`, `TimedPermission`, `Shift`, `ShiftAssignment`, `OvertimeRequest` without its photo, and `AttendanceEvent`). `PushToken` is never granted.
 
 ## Setup
 

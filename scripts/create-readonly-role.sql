@@ -22,6 +22,17 @@ GRANT SELECT ON "Attendance"   TO monitor_ro;
 GRANT SELECT ON "Organization" TO monitor_ro;
 GRANT SELECT ON "LocationPing" TO monitor_ro;
 
+-- Tables used by the day timeline. NEVER grant "PushToken".
+GRANT SELECT ON "AttendancePause" TO monitor_ro;
+GRANT SELECT ON "WorkSegment"     TO monitor_ro;
+GRANT SELECT ON "TimedPermission" TO monitor_ro;
+GRANT SELECT ON "Shift"           TO monitor_ro;
+GRANT SELECT ON "ShiftAssignment" TO monitor_ro;
+-- "OvertimeRequest": column-level, so the photo bytes stay unreadable.
+GRANT SELECT ("id", "attendanceId", "estimatedEndAt", "reason", "createdAt", "status",
+              "reviewedAt", "reviewedByName", "submittedAt")
+  ON "OvertimeRequest" TO monitor_ro;
+
 -- "User": column-level only. "pinHash" and every other secret stay unreadable.
 GRANT SELECT ("id", "employeeCode", "name", "role", "organizationId",
               "workMode", "faceVerificationEnabled", "active")
@@ -36,5 +47,15 @@ BEGIN
     EXECUTE 'GRANT SELECT ON "CheckInAttempt" TO monitor_ro';
   ELSE
     RAISE NOTICE 'CheckInAttempt does not exist yet - re-run this script after the migration.';
+  END IF;
+END $$;
+
+-- "AttendanceEvent" is created by migration 20261113000000_attendance_events (same only-if-exists pattern).
+DO $$
+BEGIN
+  IF to_regclass('public."AttendanceEvent"') IS NOT NULL THEN
+    EXECUTE 'GRANT SELECT ON "AttendanceEvent" TO monitor_ro';
+  ELSE
+    RAISE NOTICE 'AttendanceEvent does not exist yet - re-run this script after the migration.';
   END IF;
 END $$;

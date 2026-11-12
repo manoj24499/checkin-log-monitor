@@ -1,5 +1,6 @@
-import { attemptsEnabled, query } from "../db";
+import { attemptsEnabled, clientActionEnabled, query } from "../db";
 import { qs } from "../params";
+import { getAutoCheckouts } from "./autoCheckouts";
 import { fmtDateTime, istDay, istRangeSql, msSql, todayIST } from "../time";
 
 export interface AlertRow {
@@ -28,10 +29,11 @@ export async function getAlerts(from: string, to: string, how: How = ""): Promis
   const range = (col: string) => istRangeSql(col, "$1", "$2");
   const base = { from, to, how };
   // "How" narrows attempt-based rules to one channel; non-attempt rules only show for All / the matching channel.
+  const hasCA = how === "swipe" || how === "offline" ? await clientActionEnabled() : false;
   const attemptHow =
     how === "kiosk" ? ` AND upper("source") = 'KIOSK'`
-    : how === "offline" ? ` AND ("offline" OR "clientAction" = 'OFFLINE_SYNC')`
-    : how === "swipe" ? ` AND "clientAction" = 'SLIDE_TO_CONFIRM'` : "";
+    : how === "offline" ? (hasCA ? ` AND ("offline" OR "clientAction" = 'OFFLINE_SYNC')` : ` AND "offline"`)
+    : how === "swipe" ? (hasCA ? ` AND "clientAction" = 'SLIDE_TO_CONFIRM'` : ` AND false`) : "";
   const attemptRules = how === "" || how === "swipe" || how === "offline" || how === "kiosk";
 
   if (enabled && attemptRules) {
@@ -127,19 +129,25 @@ export async function getAlerts(from: string, to: string, how: How = ""): Promis
       })),
     });
 
-  const autos = await query<{ n: number }>(
-    `SELECT count(*)::int AS n FROM "Attendance" a
-     WHERE a."method"::text = 'AUTO' AND a."type"::text = 'CHECK_OUT' AND ${range('a."timestamp"')}`,
-    [from, to],
-  );
-  if (autos[0]?.n)
+  const auto = await getAutoCheckouts(from, to);
+  if (auto.rows.length)
     alerts.push({
       id: "auto-out",
-      title: "Auto check-outs",
-      severity: "low",
-      count: autos[0].n,
-      href: `/log${qs({ ...base, source: "auto", action: "CHECK_OUT" })}`,
-      rows: [],
+      title: "Automatic check-outs (done by the system)",
+      severity: "medium",
+      count: auto.rows.length,
+      href: `/log${qs({ from, to, how: "auto", action: "CHECK_OUT" })}`,
+      rows: auto.rows.map((r) => ({
+        label: `${r.name} (${r.code}) - auto check-out at ${fmtDateTime(r.ts)}`,
+        detail: r.logged
+          ? `${r.trigger ?? "trigger not recorded"}; ${
+              r.hasWarning
+                ? `warned ${r.warnedAt ?? ""} (${r.warningDelivered === true ? "notification delivered" : r.warningDelivered === false ? "notification NOT delivered" : "delivery unknown"})`
+                : "no warning logged"
+            }`
+          : "details not recorded (before logging) - open timeline for likely cause",
+        href: `/employees/${encodeURIComponent(r.code)}/day${qs({ date: istDay(r.ts) })}`,
+      })),
     });
 
   const outside = await query<{ n: number }>(
@@ -157,6 +165,14 @@ export async function getAlerts(from: string, to: string, how: How = ""): Promis
       rows: [],
     });
 
+  const keep = (id: string) =>
+    how === "" ? true
+    : how === "auto" ? id === "auto-out"
+    : how === "manual" ? false
+    : id.startsWith("rej-") || id === "repeat-pin";
+  const filtered = alerts.filter((a) => keep(a.id));
+  alerts.length = 0;
+  alerts.push(...filtered);
   const order = { high: 0, medium: 1, low: 2 } as const;
   alerts.sort((a, b) => order[a.severity] - order[b.severity]);
   return { alerts, attemptsEnabled: enabled };
