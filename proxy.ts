@@ -13,8 +13,12 @@ export async function proxy(req: NextRequest) {
   if (pathname.startsWith("/api/")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  // Relative Location so it works behind a reverse proxy.
-  return new NextResponse(null, { status: 307, headers: { Location: "/login" } });
+  // Next's proxy parses the Location it is given, so a relative "/login" throws "Invalid URL". Build an absolute
+  // one from what nginx forwards (https and the public host), not from the internal http://localhost:3100.
+  const proto = req.headers.get("x-forwarded-proto") === "https" ? "https" : "http";
+  const rawHost = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "";
+  const host = /^[A-Za-z0-9.-]+(:\d{1,5})?$/.test(rawHost) ? rawHost : req.nextUrl.host;
+  return NextResponse.redirect(`${proto}://${host}/login`, 307);
 }
 
 export const config = {
