@@ -40,7 +40,7 @@ export interface LogRow {
   attId: string | null;
   hasPhoto: boolean;
   aHasPhoto: boolean; // attempt (failed-face) photo available
-  how: string; // swipe | offline | kiosk | auto | manual | unknown
+  how: string; // swipe | app | offline | kiosk | auto | manual | unknown
 }
 
 export const REASONS = [
@@ -104,7 +104,7 @@ function buildSql(f: LogFilters, withAttempts: boolean, limit: number, offset: n
       att."faceVerifyStatus"::text AS face, att."faceSimilarity"::float8 AS sim, att."lateMinutes"::int AS late,
       NULL::float8 AS lat, NULL::float8 AS lng, NULL::boolean AS mocked, NULL::text AS ip,
       att."id" AS "attId", att."hasPhoto" AS "hasPhoto", false AS "aHasPhoto",
-      CASE att."method"::text WHEN 'AUTO' THEN 'auto' WHEN 'MANUAL' THEN 'manual' WHEN 'QR' THEN 'kiosk' ELSE 'unknown' END AS how
+      CASE att."method"::text WHEN 'AUTO' THEN 'auto' WHEN 'MANUAL' THEN 'manual' WHEN 'QR' THEN 'kiosk' WHEN 'PIN' THEN 'app' ELSE 'unknown' END AS how
     FROM "Attendance" att
     JOIN "User" u ON u."id" = att."userId"
     WHERE ${istRangeSql('att."timestamp"', from, to)}

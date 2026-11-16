@@ -5,7 +5,7 @@ import { qs } from "@/lib/params";
 import { Badge, EmployeeLink, FailedFacePhoto, FaceBadge, OutcomeBadge, TableWrap } from "./ui";
 
 const HOW: Record<string, string> = {
-  swipe: "Swipe in app", offline: "Offline sync", kiosk: "Kiosk", auto: "Automatic", manual: "Manual by admin", unknown: "Unknown (older app)",
+  swipe: "Swipe in app", app: "In app", offline: "Offline sync", kiosk: "Kiosk", auto: "Automatic", manual: "Manual by admin", unknown: "Unknown (older app)",
 };
 
 export default function LogTable({ rows }: { rows: LogRow[] }) {
